@@ -24,7 +24,8 @@ export const useUpload = () => {
   const uploadFile = async (
     file: File,
     method: 'mobile_scan' | 'tablet_capture' | 'file_upload',
-    assignmentTitle?: string
+    assignmentTitle?: string,
+    assignmentId?: string
   ): Promise<UploadResult> => {
     try {
       setUploadProgress({ isUploading: true, progress: 0 });
@@ -56,9 +57,9 @@ export const useUpload = () => {
 
       setUploadProgress({ isUploading: true, progress: 50 });
 
-      // Create assignment if title provided
-      let assignmentId = null;
-      if (assignmentTitle) {
+      // Create assignment if title provided and no assignmentId
+      let finalAssignmentId = assignmentId;
+      if (!assignmentId && assignmentTitle) {
         const { data: assignment, error: assignmentError } = await supabase
           .from('assignments')
           .insert({
@@ -72,7 +73,7 @@ export const useUpload = () => {
         if (assignmentError) {
           throw assignmentError;
         }
-        assignmentId = assignment.id;
+        finalAssignmentId = assignment.id;
       }
 
       setUploadProgress({ isUploading: true, progress: 75 });
@@ -81,7 +82,7 @@ export const useUpload = () => {
       const { data: upload, error: uploadRecordError } = await supabase
         .from('uploads')
         .insert({
-          assignment_id: assignmentId,
+          assignment_id: finalAssignmentId,
           user_id: user.id,
           file_name: file.name,
           file_path: filePath,
