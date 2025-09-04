@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { CameraCapture } from "@/components/upload/CameraCapture";
 import { FileUpload } from "@/components/upload/FileUpload";
+import { AssignmentSelector } from "@/components/upload/AssignmentSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -28,8 +29,10 @@ export const Assignments = () => {
   const [showTabletCapture, setShowTabletCapture] = useState(false);
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showAssignmentSelector, setShowAssignmentSelector] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<'mobile_scan' | 'tablet_capture' | 'file_upload' | null>(null);
+  const [selectedAssignmentForSubmission, setSelectedAssignmentForSubmission] = useState<{id: string, title: string} | null>(null);
   const [assignments, setAssignments] = useState<any[]>([]);
-  const [assignmentsWithSubmissions, setAssignmentsWithSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({ title: "", description: "" });
   const { toast } = useToast();
@@ -40,50 +43,16 @@ export const Assignments = () => {
 
   const fetchAssignments = async () => {
     try {
-      const { data: assignmentsData, error: assignmentsError } = await supabase
+      const { data, error } = await supabase
         .from('assignments')
-        .select('*')
+        .select(`
+          *,
+          uploads(id, file_name, status, uploaded_at, upload_method)
+        `)
         .order('created_at', { ascending: false });
 
-      if (assignmentsError) throw assignmentsError;
-      setAssignments(assignmentsData || []);
-
-      // Fetch submissions and their files for each assignment
-      const assignmentsWithSubmissionCounts = await Promise.all(
-        (assignmentsData || []).map(async (assignment) => {
-          // Get submissions for this assignment
-          const { data: submissionsData, error: submissionsError } = await supabase
-            .from('submissions')
-            .select(`
-              *,
-              submission_files (*)
-            `)
-            .eq('assignment_id', assignment.id)
-            .order('created_at', { ascending: false });
-
-          if (submissionsError) {
-            console.error('Error fetching submissions for assignment:', assignment.id, submissionsError);
-          }
-
-          // Flatten submission files for recent submissions preview
-          const allFiles = (submissionsData || []).flatMap(submission => 
-            (submission.submission_files || []).map(file => ({
-              ...file,
-              submission_id: submission.id
-            }))
-          );
-
-          return {
-            ...assignment,
-            submissions: submissionsData || [],
-            submissionCount: (submissionsData || []).length,
-            totalFiles: allFiles.length,
-            recentFiles: allFiles.slice(0, 3)
-          };
-        })
-      );
-
-      setAssignmentsWithSubmissions(assignmentsWithSubmissionCounts);
+      if (error) throw error;
+      setAssignments(data || []);
     } catch (error) {
       console.error('Error fetching assignments:', error);
     } finally {
@@ -132,6 +101,34 @@ export const Assignments = () => {
     }
   };
 
+  const handleModeSelection = (mode: 'mobile_scan' | 'tablet_capture' | 'file_upload') => {
+    setSelectedMode(mode);
+    setShowAssignmentSelector(true);
+  };
+
+  const handleAssignmentSelection = (assignmentId: string, assignmentTitle: string) => {
+    setSelectedAssignmentForSubmission({ id: assignmentId, title: assignmentTitle });
+    setShowAssignmentSelector(false);
+    
+    // Open the appropriate modal based on selected mode
+    if (selectedMode === 'mobile_scan') {
+      setShowMobileScan(true);
+    } else if (selectedMode === 'tablet_capture') {
+      setShowTabletCapture(true);
+    } else if (selectedMode === 'file_upload') {
+      setShowFileUpload(true);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setSelectedAssignmentForSubmission(null);
+    setSelectedMode(null);
+    setShowMobileScan(false);
+    setShowTabletCapture(false);
+    setShowFileUpload(false);
+    fetchAssignments(); // Refresh assignments after upload
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -154,7 +151,7 @@ export const Assignments = () => {
                 Scan a printed assignment with your phone
               </p>
             </div>
-            <Button className="w-full" onClick={() => setShowMobileScan(true)}>
+            <Button className="w-full" onClick={() => handleModeSelection('mobile_scan')}>
               <Smartphone className="mr-2 h-4 w-4" />
               Scan Assignment
             </Button>
@@ -172,7 +169,7 @@ export const Assignments = () => {
                 Use tablet camera for larger view
               </p>
             </div>
-            <Button variant="secondary" className="w-full" onClick={() => setShowTabletCapture(true)}>
+            <Button variant="secondary" className="w-full" onClick={() => handleModeSelection('tablet_capture')}>
               <Tablet className="mr-2 h-4 w-4" />
               Tablet Mode
             </Button>
@@ -190,7 +187,7 @@ export const Assignments = () => {
                 Upload digital assignment files
               </p>
             </div>
-            <Button variant="outline" className="w-full border-accent text-accent hover:bg-accent hover:text-accent-foreground" onClick={() => setShowFileUpload(true)}>
+            <Button variant="outline" className="w-full border-accent text-accent hover:bg-accent hover:text-accent-foreground" onClick={() => handleModeSelection('file_upload')}>
               <Upload className="mr-2 h-4 w-4" />
               Upload File
             </Button>
@@ -261,68 +258,66 @@ export const Assignments = () => {
           <div className="space-y-4">
             {loading ? (
               <p className="text-center text-muted-foreground">Loading assignments...</p>
-            ) : assignmentsWithSubmissions.length === 0 ? (
+            ) : assignments.length === 0 ? (
               <p className="text-center text-muted-foreground">No assignments yet. Create your first assignment above!</p>
             ) : (
-              assignmentsWithSubmissions.map((assignment) => (
+              assignments.map((assignment) => (
                 <div
                   key={assignment.id}
-                  className="p-6 rounded-lg border hover:bg-muted/50 transition-colors space-y-4"
+                  className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1 flex-1">
-                      <div className="flex items-center space-x-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{assignment.title}</span>
-                        <span className="text-sm text-muted-foreground">
-                          ({assignment.submissionCount} submission{assignment.submissionCount !== 1 ? 's' : ''})
-                        </span>
-                      </div>
-                      {assignment.description && (
-                        <p className="text-sm text-muted-foreground">{assignment.description}</p>
-                      )}
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <span className="flex items-center">
-                          <Calendar className="mr-1 h-3 w-3" />
-                          Created {new Date(assignment.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
+                  <div className="space-y-1 flex-1">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{assignment.title}</span>
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => navigate(`/assignments/${assignment.id}`)}
-                      >
-                        <Users className="mr-2 h-4 w-4" />
-                        View Details ({assignment.submissionCount})
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        Edit
-                      </Button>
+                    {assignment.description && (
+                      <p className="text-sm text-muted-foreground">{assignment.description}</p>
+                    )}
+                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                      <span className="flex items-center">
+                        <Calendar className="mr-1 h-3 w-3" />
+                        Created {new Date(assignment.created_at).toLocaleDateString()}
+                      </span>
+                      <span className="flex items-center">
+                        <Upload className="mr-1 h-3 w-3" />
+                        {assignment.uploads?.length || 0} submission{(assignment.uploads?.length || 0) !== 1 ? 's' : ''}
+                      </span>
                     </div>
-                  </div>
-                  
-                  {/* Recent files preview */}
-                  {Array.isArray(assignment.recentFiles) && assignment.recentFiles.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Recent Files ({assignment.totalFiles ?? 0} total):</p>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                        {assignment.recentFiles.map((file: any) => (
-                          <div
-                            key={file.id}
-                            className="flex items-center space-x-2 p-2 bg-muted/50 rounded text-xs"
-                          >
-                            <Camera className="h-3 w-3 text-muted-foreground" />
-                            <span className="truncate">{file.file_name}</span>
-                            <span className="text-muted-foreground">
-                              {new Date(file.uploaded_at).toLocaleDateString()}
+                    {assignment.uploads && assignment.uploads.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs text-muted-foreground">
+                          Recent Files ({assignment.uploads.length} total):
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {assignment.uploads.slice(0, 3).map((upload: any, index: number) => (
+                            <span key={upload.id} className="text-xs bg-muted px-2 py-1 rounded flex items-center">
+                              <FileText className="mr-1 h-2 w-2" />
+                              {upload.file_name}
                             </span>
-                          </div>
-                        ))}
+                          ))}
+                          {assignment.uploads.length > 3 && (
+                            <span className="text-xs text-muted-foreground">
+                              +{assignment.uploads.length - 3} more
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => navigate(`/assignments/${assignment.id}`)}
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      View Details ({assignment.uploads?.length || 0})
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      Edit
+                    </Button>
+                  </div>
                 </div>
               ))
             )}
@@ -331,32 +326,36 @@ export const Assignments = () => {
       </Card>
 
       {/* Modals */}
+      <AssignmentSelector
+        open={showAssignmentSelector}
+        onClose={() => setShowAssignmentSelector(false)}
+        onSelectAssignment={handleAssignmentSelection}
+        mode={selectedMode || 'mobile_scan'}
+      />
+
       {showMobileScan && (
         <CameraCapture
           mode="mobile_scan"
-          onClose={() => {
-            setShowMobileScan(false);
-            fetchAssignments();
-          }}
+          assignmentId={selectedAssignmentForSubmission?.id}
+          assignmentTitle={selectedAssignmentForSubmission?.title}
+          onClose={handleCloseModal}
         />
       )}
 
       {showTabletCapture && (
         <CameraCapture
           mode="tablet_capture"
-          onClose={() => {
-            setShowTabletCapture(false);
-            fetchAssignments();
-          }}
+          assignmentId={selectedAssignmentForSubmission?.id}
+          assignmentTitle={selectedAssignmentForSubmission?.title}
+          onClose={handleCloseModal}
         />
       )}
 
       {showFileUpload && (
         <FileUpload
-          onClose={() => {
-            setShowFileUpload(false);
-            fetchAssignments();
-          }}
+          assignmentId={selectedAssignmentForSubmission?.id}
+          assignmentTitle={selectedAssignmentForSubmission?.title}
+          onClose={handleCloseModal}
         />
       )}
     </div>
