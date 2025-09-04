@@ -3,8 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Camera, X, RotateCcw, Check } from 'lucide-react';
+import { Camera, X, RotateCcw, Check, AlertCircle } from 'lucide-react';
 import { useUpload } from '@/hooks/use-upload';
+import { useToast } from '@/hooks/use-toast';
 
 interface CameraCaptureProps {
   mode: 'mobile_scan' | 'tablet_capture';
@@ -19,11 +20,23 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
   const [isStreaming, setIsStreaming] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [assignmentTitle, setAssignmentTitle] = useState('');
+  const [error, setError] = useState<string | null>(null);
   
   const { uploadFile, uploadProgress } = useUpload();
+  const { toast } = useToast();
 
   const startCamera = useCallback(async () => {
+    console.log('Starting camera...'); // Debug log
+    setError(null); // Clear any previous errors
+    
     try {
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera access is not supported in this browser');
+      }
+
+      console.log('Requesting camera permissions...'); // Debug log
+      
       const constraints = {
         video: {
           facingMode: 'environment', // Use back camera
@@ -33,17 +46,47 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('Camera stream obtained successfully'); // Debug log
+      
       streamRef.current = stream;
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
-        setIsStreaming(true);
+        
+        // Wait for video to be ready before setting isStreaming
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Video metadata loaded, starting playback');
+          videoRef.current?.play();
+          setIsStreaming(true);
+        };
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
+      
+      let errorMessage = 'Failed to access camera';
+      
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          errorMessage = 'Camera permission denied. Please allow camera access and try again.';
+        } else if (error.name === 'NotFoundError') {
+          errorMessage = 'No camera found. Please check your device has a camera.';
+        } else if (error.name === 'NotSupportedError') {
+          errorMessage = 'Camera access is not supported in this browser.';
+        } else if (error.name === 'NotReadableError') {
+          errorMessage = 'Camera is already in use by another application.';
+        } else {
+          errorMessage = `Camera error: ${error.message}`;
+        }
+      }
+      
+      setError(errorMessage);
+      toast({
+        title: "Camera Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
     }
-  }, []);
+  }, [toast]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -113,6 +156,23 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
               <X className="h-4 w-4" />
             </Button>
           </div>
+
+           {error && (
+             <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2">
+               <AlertCircle className="h-5 w-5 text-destructive" />
+               <div className="flex-1">
+                 <p className="text-sm text-destructive">{error}</p>
+               </div>
+               <Button 
+                 variant="outline" 
+                 size="sm" 
+                 onClick={startCamera}
+                 className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+               >
+                 Try Again
+               </Button>
+             </div>
+           )}
 
           {!isStreaming && !capturedImage && (
             <div className="text-center space-y-4">
