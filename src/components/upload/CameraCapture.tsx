@@ -52,11 +52,13 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
       console.log('Camera constraints:', constraints);
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      console.log('Camera stream obtained successfully'); // Debug log
+      console.log('Camera stream obtained successfully', stream); // Debug log
+      console.log('Stream tracks:', stream.getTracks());
       
       streamRef.current = stream;
       
       if (videoRef.current) {
+        console.log('Setting video source to stream');
         videoRef.current.srcObject = stream;
         
         // Fallback: if metadata doesn't load within 3 seconds, try to start anyway
@@ -89,6 +91,20 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
             setIsStartingCamera(false);
           });
         };
+
+        // Immediate attempt to play and set streaming - sometimes metadata event doesn't fire
+        setTimeout(() => {
+          if (videoRef.current && videoRef.current.srcObject) {
+            console.log('Attempting immediate video play');
+            videoRef.current.play().then(() => {
+              console.log('Immediate video play successful');
+              setIsStreaming(true);
+              setIsStartingCamera(false);
+            }).catch((error) => {
+              console.log('Immediate play failed, waiting for metadata event:', error);
+            });
+          }
+        }, 500);
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
@@ -242,7 +258,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
             </div>
           )}
 
-          {isStreaming && (
+          {(isStreaming || isStartingCamera) && (
             <div className="space-y-4">
               <div className="relative">
                 <video
@@ -254,10 +270,12 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
                 />
                 <div className="absolute inset-0 border-2 border-primary/50 rounded-lg pointer-events-none" />
               </div>
-              <Button onClick={capturePhoto} className="w-full">
-                <Camera className="mr-2 h-4 w-4" />
-                Capture Photo
-              </Button>
+              {isStreaming && (
+                <Button onClick={capturePhoto} className="w-full">
+                  <Camera className="mr-2 h-4 w-4" />
+                  Capture Photo
+                </Button>
+              )}
             </div>
           )}
 
