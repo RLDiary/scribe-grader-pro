@@ -7,7 +7,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Dashboard } from "@/pages/Dashboard";
 import { Assignments } from "@/pages/Assignments";
-import { Uploads } from "@/pages/Uploads";
+import { Submissions } from "@/pages/Submissions";
+import { AssignmentDetails } from "@/pages/AssignmentDetails";
 import { Grading } from "@/pages/Grading";
 import { Reports } from "@/pages/Reports";
 import { Auth } from "@/pages/Auth";
@@ -40,10 +41,17 @@ const App = () => (
                 </Layout>
               </ProtectedRoute>
             } />
-            <Route path="/uploads" element={
+            <Route path="/submissions" element={
               <ProtectedRoute>
                 <Layout>
-                  <Uploads />
+                  <Submissions />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/assignments/:id" element={
+              <ProtectedRoute>
+                <Layout>
+                  <AssignmentDetails />
                 </Layout>
               </ProtectedRoute>
             } />

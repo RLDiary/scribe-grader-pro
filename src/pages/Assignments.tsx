@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export const Assignments = () => {
+  const navigate = useNavigate();
   const [showMobileScan, setShowMobileScan] = useState(false);
   const [showTabletCapture, setShowTabletCapture] = useState(false);
   const [showFileUpload, setShowFileUpload] = useState(false);
@@ -245,9 +247,13 @@ export const Assignments = () => {
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <Button variant="ghost" size="sm">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => navigate(`/assignments/${assignment.id}`)}
+                    >
                       <Users className="mr-2 h-4 w-4" />
-                      View Submissions
+                      View Details
                     </Button>
                     <Button variant="outline" size="sm">
                       Edit

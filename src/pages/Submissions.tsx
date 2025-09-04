@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { 
   Camera, 
   Upload, 
@@ -15,23 +13,25 @@ import {
 } from "lucide-react";
 import { CameraCapture } from "@/components/upload/CameraCapture";
 import { FileUpload } from "@/components/upload/FileUpload";
+import { AssignmentSelector } from "@/components/upload/AssignmentSelector";
 import { supabase } from "@/integrations/supabase/client";
 
-export const Uploads = () => {
+export const Submissions = () => {
   const [showMobileScan, setShowMobileScan] = useState(false);
   const [showTabletCapture, setShowTabletCapture] = useState(false);
   const [showFileUpload, setShowFileUpload] = useState(false);
-  const [recentUploads, setRecentUploads] = useState<any[]>([]);
-  const [assignments, setAssignments] = useState<any[]>([]);
-  const [selectedAssignment, setSelectedAssignment] = useState<string>("");
+  const [showAssignmentSelector, setShowAssignmentSelector] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<'mobile_scan' | 'tablet_capture' | 'file_upload'>('mobile_scan');
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>("");
+  const [selectedAssignmentTitle, setSelectedAssignmentTitle] = useState<string>("");
+  const [recentSubmissions, setRecentSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchRecentUploads();
-    fetchAssignments();
+    fetchRecentSubmissions();
   }, []);
 
-  const fetchRecentUploads = async () => {
+  const fetchRecentSubmissions = async () => {
     try {
       const { data, error } = await supabase
         .from('uploads')
@@ -43,25 +43,34 @@ export const Uploads = () => {
         .limit(10);
 
       if (error) throw error;
-      setRecentUploads(data || []);
+      setRecentSubmissions(data || []);
     } catch (error) {
-      console.error('Error fetching uploads:', error);
+      console.error('Error fetching submissions:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchAssignments = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('assignments')
-        .select('id, title')
-        .order('created_at', { ascending: false });
+  const handleModeClick = (mode: 'mobile_scan' | 'tablet_capture' | 'file_upload') => {
+    setSelectedMode(mode);
+    setShowAssignmentSelector(true);
+  };
 
-      if (error) throw error;
-      setAssignments(data || []);
-    } catch (error) {
-      console.error('Error fetching assignments:', error);
+  const handleAssignmentSelected = (assignmentId: string, assignmentTitle: string) => {
+    setSelectedAssignmentId(assignmentId);
+    setSelectedAssignmentTitle(assignmentTitle);
+    
+    // Open the appropriate modal based on selected mode
+    switch (selectedMode) {
+      case 'mobile_scan':
+        setShowMobileScan(true);
+        break;
+      case 'tablet_capture':
+        setShowTabletCapture(true);
+        break;
+      case 'file_upload':
+        setShowFileUpload(true);
+        break;
     }
   };
 
@@ -94,40 +103,11 @@ export const Uploads = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Upload Student Answer Sheets</h1>
+        <h1 className="text-3xl font-bold">Student Submissions</h1>
         <p className="text-muted-foreground mt-2">
-          Scan or upload student answer sheets and assign them to specific assignments for AI-powered grading
+          Upload and manage student submissions for AI-powered grading
         </p>
       </div>
-
-      {/* Assignment Selection */}
-      <Card className="bg-blue-50 border-blue-200">
-        <CardHeader>
-          <CardTitle className="text-blue-900">Select Assignment</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Label htmlFor="assignment-select">Choose which assignment these uploads belong to:</Label>
-            <Select value={selectedAssignment} onValueChange={setSelectedAssignment}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select an assignment..." />
-              </SelectTrigger>
-              <SelectContent>
-                {assignments.map((assignment) => (
-                  <SelectItem key={assignment.id} value={assignment.id}>
-                    {assignment.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {!selectedAssignment && (
-              <p className="text-sm text-blue-600">
-                Please select an assignment before uploading student answer sheets
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Upload Options */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -139,16 +119,12 @@ export const Uploads = () => {
             <div>
               <h3 className="font-semibold text-lg">Mobile Scan</h3>
               <p className="text-sm text-muted-foreground">
-                Use your phone or tablet to scan answer sheets directly
+                Use your phone to scan student answer sheets directly
               </p>
             </div>
             <Button 
               className="w-full" 
-              disabled={!selectedAssignment}
-              onClick={() => {
-                console.log('Mobile Scan button clicked'); // Debug log
-                setShowMobileScan(true);
-              }}
+              onClick={() => handleModeClick('mobile_scan')}
             >
               <Smartphone className="mr-2 h-4 w-4" />
               Start Mobile Scan
@@ -170,8 +146,7 @@ export const Uploads = () => {
             <Button 
               variant="secondary" 
               className="w-full" 
-              disabled={!selectedAssignment}
-              onClick={() => setShowTabletCapture(true)}
+              onClick={() => handleModeClick('tablet_capture')}
             >
               <Tablet className="mr-2 h-4 w-4" />
               Use Tablet Mode
@@ -193,8 +168,7 @@ export const Uploads = () => {
             <Button 
               variant="outline" 
               className="w-full border-accent text-accent hover:bg-accent hover:text-accent-foreground" 
-              disabled={!selectedAssignment}
-              onClick={() => setShowFileUpload(true)}
+              onClick={() => handleModeClick('file_upload')}
             >
               <Upload className="mr-2 h-4 w-4" />
               Browse Files
@@ -203,12 +177,12 @@ export const Uploads = () => {
         </Card>
       </div>
 
-      {/* Mobile Scanning Instructions */}
+      {/* Scanning Instructions */}
       <Card className="bg-primary-subtle border-primary/20">
         <CardHeader>
           <CardTitle className="flex items-center text-primary">
             <FileText className="mr-2 h-5 w-5" />
-            Mobile Scanning Tips
+            Submission Scanning Tips
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -235,56 +209,56 @@ export const Uploads = () => {
         </CardContent>
       </Card>
 
-      {/* Upload History */}
+      {/* Recent Submissions */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Uploads</CardTitle>
+          <CardTitle>Recent Submissions</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {loading ? (
-              <p className="text-center text-muted-foreground">Loading uploads...</p>
-            ) : recentUploads.length === 0 ? (
-              <p className="text-center text-muted-foreground">No uploads yet. Start by uploading your first assignment!</p>
+              <p className="text-center text-muted-foreground">Loading submissions...</p>
+            ) : recentSubmissions.length === 0 ? (
+              <p className="text-center text-muted-foreground">No submissions yet. Start by uploading your first student submissions!</p>
             ) : (
-              recentUploads.map((upload) => (
+              recentSubmissions.map((submission) => (
               <div
-                key={upload.id}
+                key={submission.id}
                 className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
               >
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{upload.file_name}</span>
-                    {getStatusIcon(upload.status)}
+                    <span className="font-medium">{submission.file_name}</span>
+                    {getStatusIcon(submission.status)}
                   </div>
                   <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                    <span>{upload.assignments?.title || 'Untitled Assignment'}</span>
+                    <span>{submission.assignments?.title || 'Untitled Assignment'}</span>
                     <span>•</span>
-                    <span>{new Date(upload.uploaded_at).toLocaleString()}</span>
-                    {upload.student_count > 0 && (
+                    <span>{new Date(submission.uploaded_at).toLocaleString()}</span>
+                    {submission.student_count > 0 && (
                       <>
                         <span>•</span>
-                        <span>{upload.student_count} students</span>
+                        <span>{submission.student_count} students</span>
                       </>
                     )}
                   </div>
-                  {upload.error_message && (
-                    <p className="text-sm text-destructive">{upload.error_message}</p>
+                  {submission.error_message && (
+                    <p className="text-sm text-destructive">{submission.error_message}</p>
                   )}
                 </div>
                 <div className="flex items-center space-x-3">
-                  {upload.processing_time && (
+                  {submission.processing_time && (
                     <span className="text-sm text-muted-foreground">
-                      {upload.processing_time}
+                      {submission.processing_time}
                     </span>
                   )}
                   <span
                     className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                      upload.status
+                      submission.status
                     )}`}
                   >
-                    {upload.status}
+                    {submission.status}
                   </span>
                   <Button variant="ghost" size="sm">
                     View Details
@@ -297,19 +271,23 @@ export const Uploads = () => {
         </CardContent>
       </Card>
 
-      {/* Camera and Upload Modals */}
+      {/* Assignment Selector Modal */}
+      <AssignmentSelector
+        open={showAssignmentSelector}
+        onClose={() => setShowAssignmentSelector(false)}
+        onSelectAssignment={handleAssignmentSelected}
+        mode={selectedMode}
+      />
+
+      {/* Upload Modals */}
       {showMobileScan && (
-        <>
-          {console.log('Rendering mobile scan modal')} {/* Debug log */}
-          <CameraCapture
-            mode="mobile_scan"
-            onClose={() => {
-              console.log('Closing mobile scan modal'); // Debug log
-              setShowMobileScan(false);
-              fetchRecentUploads();
-            }}
-          />
-        </>
+        <CameraCapture
+          mode="mobile_scan"
+          onClose={() => {
+            setShowMobileScan(false);
+            fetchRecentSubmissions();
+          }}
+        />
       )}
 
       {showTabletCapture && (
@@ -317,7 +295,7 @@ export const Uploads = () => {
           mode="tablet_capture"
           onClose={() => {
             setShowTabletCapture(false);
-            fetchRecentUploads();
+            fetchRecentSubmissions();
           }}
         />
       )}
@@ -326,7 +304,7 @@ export const Uploads = () => {
         <FileUpload
           onClose={() => {
             setShowFileUpload(false);
-            fetchRecentUploads();
+            fetchRecentSubmissions();
           }}
         />
       )}
