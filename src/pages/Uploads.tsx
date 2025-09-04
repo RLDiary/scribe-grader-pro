@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { 
   Camera, 
   Upload, 
@@ -20,10 +22,13 @@ export const Uploads = () => {
   const [showTabletCapture, setShowTabletCapture] = useState(false);
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [recentUploads, setRecentUploads] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [selectedAssignment, setSelectedAssignment] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchRecentUploads();
+    fetchAssignments();
   }, []);
 
   const fetchRecentUploads = async () => {
@@ -43,6 +48,20 @@ export const Uploads = () => {
       console.error('Error fetching uploads:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAssignments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('id, title')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAssignments(data || []);
+    } catch (error) {
+      console.error('Error fetching assignments:', error);
     }
   };
 
@@ -75,11 +94,40 @@ export const Uploads = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Upload Assignments</h1>
+        <h1 className="text-3xl font-bold">Upload Student Answer Sheets</h1>
         <p className="text-muted-foreground mt-2">
-          Scan or upload student answer sheets for AI-powered grading
+          Scan or upload student answer sheets and assign them to specific assignments for AI-powered grading
         </p>
       </div>
+
+      {/* Assignment Selection */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardHeader>
+          <CardTitle className="text-blue-900">Select Assignment</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="assignment-select">Choose which assignment these uploads belong to:</Label>
+            <Select value={selectedAssignment} onValueChange={setSelectedAssignment}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select an assignment..." />
+              </SelectTrigger>
+              <SelectContent>
+                {assignments.map((assignment) => (
+                  <SelectItem key={assignment.id} value={assignment.id}>
+                    {assignment.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!selectedAssignment && (
+              <p className="text-sm text-blue-600">
+                Please select an assignment before uploading student answer sheets
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Upload Options */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -94,10 +142,14 @@ export const Uploads = () => {
                 Use your phone or tablet to scan answer sheets directly
               </p>
             </div>
-            <Button className="w-full" onClick={() => {
-              console.log('Mobile Scan button clicked'); // Debug log
-              setShowMobileScan(true);
-            }}>
+            <Button 
+              className="w-full" 
+              disabled={!selectedAssignment}
+              onClick={() => {
+                console.log('Mobile Scan button clicked'); // Debug log
+                setShowMobileScan(true);
+              }}
+            >
               <Smartphone className="mr-2 h-4 w-4" />
               Start Mobile Scan
             </Button>
@@ -115,7 +167,12 @@ export const Uploads = () => {
                 Perfect for classroom use with larger screens
               </p>
             </div>
-            <Button variant="secondary" className="w-full" onClick={() => setShowTabletCapture(true)}>
+            <Button 
+              variant="secondary" 
+              className="w-full" 
+              disabled={!selectedAssignment}
+              onClick={() => setShowTabletCapture(true)}
+            >
               <Tablet className="mr-2 h-4 w-4" />
               Use Tablet Mode
             </Button>
@@ -133,7 +190,12 @@ export const Uploads = () => {
                 Upload pre-scanned PDFs or image files
               </p>
             </div>
-            <Button variant="outline" className="w-full border-accent text-accent hover:bg-accent hover:text-accent-foreground" onClick={() => setShowFileUpload(true)}>
+            <Button 
+              variant="outline" 
+              className="w-full border-accent text-accent hover:bg-accent hover:text-accent-foreground" 
+              disabled={!selectedAssignment}
+              onClick={() => setShowFileUpload(true)}
+            >
               <Upload className="mr-2 h-4 w-4" />
               Browse Files
             </Button>

@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Dashboard } from "@/pages/Dashboard";
+import { Assignments } from "@/pages/Assignments";
 import { Uploads } from "@/pages/Uploads";
 import { Grading } from "@/pages/Grading";
 import { Reports } from "@/pages/Reports";
@@ -29,6 +30,13 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/assignments" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Assignments />
                 </Layout>
               </ProtectedRoute>
             } />
