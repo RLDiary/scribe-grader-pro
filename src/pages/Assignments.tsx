@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -16,7 +15,6 @@ import {
   Tablet,
   BookOpen,
   Calendar,
-  Clock,
   Users
 } from "lucide-react";
 import { CameraCapture } from "@/components/upload/CameraCapture";
@@ -43,30 +41,11 @@ export const Assignments = () => {
     try {
       const { data, error } = await supabase
         .from('assignments')
-        .select(`
-          *,
-          submissions:uploads(count),
-          recent_submissions:uploads(
-            id,
-            file_name,
-            uploaded_at,
-            status
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
-      // Process the data to get submission counts and recent submissions
-      const processedAssignments = (data || []).map(assignment => ({
-        ...assignment,
-        submission_count: assignment.submissions?.[0]?.count || 0,
-        recent_submissions: (assignment.recent_submissions || [])
-          .sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())
-          .slice(0, 3)
-      }));
-      
-      setAssignments(processedAssignments);
+      setAssignments(data || []);
     } catch (error) {
       console.error('Error fetching assignments:', error);
     } finally {
@@ -250,69 +229,31 @@ export const Assignments = () => {
               assignments.map((assignment) => (
                 <div
                   key={assignment.id}
-                  className="flex items-start justify-between p-6 rounded-lg border hover:bg-muted/50 transition-colors"
+                  className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
                 >
-                  <div className="space-y-3 flex-1">
+                  <div className="space-y-1 flex-1">
                     <div className="flex items-center space-x-2">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-semibold text-lg">{assignment.title}</span>
-                      <Badge variant="outline" className="ml-2">
-                        {assignment.submission_count} submission{assignment.submission_count !== 1 ? 's' : ''}
-                      </Badge>
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{assignment.title}</span>
                     </div>
                     {assignment.description && (
-                      <p className="text-muted-foreground">{assignment.description}</p>
+                      <p className="text-sm text-muted-foreground">{assignment.description}</p>
                     )}
                     <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                       <span className="flex items-center">
                         <Calendar className="mr-1 h-3 w-3" />
                         Created {new Date(assignment.created_at).toLocaleDateString()}
                       </span>
-                      {assignment.recent_submissions && assignment.recent_submissions.length > 0 && (
-                        <span className="flex items-center">
-                          <Clock className="mr-1 h-3 w-3" />
-                          Last activity {new Date(assignment.recent_submissions[0].uploaded_at).toLocaleDateString()}
-                        </span>
-                      )}
                     </div>
-                    
-                    {/* Recent Submissions Preview */}
-                    {assignment.recent_submissions && assignment.recent_submissions.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-muted">
-                        <p className="text-sm font-medium mb-2">Recent Activity:</p>
-                        <div className="space-y-1">
-                          {assignment.recent_submissions.map((submission: any) => (
-                            <div key={submission.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span className="truncate flex-1 mr-2">{submission.file_name}</span>
-                              <div className="flex items-center space-x-2">
-                                <Badge 
-                                  variant={submission.status === 'processed' ? 'default' : 'secondary'}
-                                  className="text-xs"
-                                >
-                                  {submission.status}
-                                </Badge>
-                                <span>{new Date(submission.uploaded_at).toLocaleDateString()}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
-                  <div className="flex items-center space-x-3 ml-6">
+                  <div className="flex items-center space-x-3">
                     <Button 
                       variant="ghost" 
                       size="sm"
                       onClick={() => navigate(`/assignments/${assignment.id}`)}
-                      className="flex items-center"
                     >
                       <Users className="mr-2 h-4 w-4" />
                       View Details
-                      {assignment.submission_count > 0 && (
-                        <Badge variant="secondary" className="ml-2">
-                          {assignment.submission_count}
-                        </Badge>
-                      )}
                     </Button>
                     <Button variant="outline" size="sm">
                       Edit
