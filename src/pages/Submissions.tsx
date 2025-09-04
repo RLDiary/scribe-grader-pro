@@ -283,6 +283,8 @@ export const Submissions = () => {
       {showMobileScan && (
         <CameraCapture
           mode="mobile_scan"
+          assignmentId={selectedAssignmentId}
+          assignmentTitle={selectedAssignmentTitle}
           onClose={() => {
             setShowMobileScan(false);
             fetchRecentSubmissions();
@@ -293,6 +295,8 @@ export const Submissions = () => {
       {showTabletCapture && (
         <CameraCapture
           mode="tablet_capture"
+          assignmentId={selectedAssignmentId}
+          assignmentTitle={selectedAssignmentTitle}
           onClose={() => {
             setShowTabletCapture(false);
             fetchRecentSubmissions();

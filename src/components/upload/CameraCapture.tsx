@@ -10,9 +10,11 @@ import { useToast } from '@/hooks/use-toast';
 interface CameraCaptureProps {
   mode: 'mobile_scan' | 'tablet_capture';
   onClose: () => void;
+  assignmentId?: string;
+  assignmentTitle?: string;
 }
 
-export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) => {
+export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose, assignmentId, assignmentTitle }) => {
   console.log('CameraCapture component mounted with mode:', mode); // Debug log
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -22,7 +24,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
   const [isStreaming, setIsStreaming] = useState(false);
   const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
-  const [assignmentTitle, setAssignmentTitle] = useState('');
+  const [newAssignmentTitle, setNewAssignmentTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
@@ -175,7 +177,11 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
   }, []);
 
   const handleUpload = useCallback(async () => {
-    if (capturedImages.length === 0 || !assignmentTitle.trim()) return;
+    if (capturedImages.length === 0) return;
+    
+    // For assignment creation, need title; for submissions, use existing assignment
+    const titleToUse = assignmentTitle || newAssignmentTitle;
+    if (!assignmentTitle && !newAssignmentTitle.trim()) return;
     
     setIsUploading(true);
     let successCount = 0;
@@ -188,9 +194,19 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
         // Convert data URL to File
         const response = await fetch(imageDataUrl);
         const blob = await response.blob();
-        const file = new File([blob], `${mode}_${Date.now()}_${i + 1}.jpg`, { type: 'image/jpeg' });
-
-        const result = await uploadFile(file, mode, assignmentTitle);
+        
+        let fileName: string;
+        if (assignmentTitle) {
+          // For submissions: assignmentname_submission_1.jpeg
+          const sanitizedAssignmentName = assignmentTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+          fileName = `${sanitizedAssignmentName}_submission_${i + 1}.jpeg`;
+        } else {
+          // For assignment creation: mode_timestamp_index.jpg
+          fileName = `${mode}_${Date.now()}_${i + 1}.jpg`;
+        }
+        
+        const file = new File([blob], fileName, { type: 'image/jpeg' });
+        const result = await uploadFile(file, mode, titleToUse);
         if (result.success) {
           successCount++;
         } else {
@@ -210,7 +226,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
     } finally {
       setIsUploading(false);
     }
-  }, [capturedImages, assignmentTitle, uploadFile, mode, onClose, toast]);
+  }, [capturedImages, assignmentTitle, newAssignmentTitle, uploadFile, mode, onClose, toast]);
 
   const handleClose = useCallback(() => {
     stopCamera();
@@ -271,14 +287,23 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
                  <Camera className="h-12 w-12 text-primary" />
                </div>
                <div>
-                 <Label htmlFor="assignment-title">Assignment Title</Label>
-                 <Input
-                   id="assignment-title"
-                   placeholder="Enter assignment title"
-                   value={assignmentTitle}
-                   onChange={(e) => setAssignmentTitle(e.target.value)}
-                   className="mt-1"
-                 />
+                 {assignmentTitle ? (
+                   <>
+                     <h3 className="font-semibold text-lg">Ready to capture</h3>
+                     <p className="text-sm text-muted-foreground">Assignment: {assignmentTitle}</p>
+                   </>
+                 ) : (
+                   <>
+                     <Label htmlFor="assignment-title">Assignment Title</Label>
+                     <Input
+                       id="assignment-title"
+                       placeholder="Enter assignment title"
+                       value={newAssignmentTitle}
+                       onChange={(e) => setNewAssignmentTitle(e.target.value)}
+                       className="mt-1"
+                     />
+                   </>
+                 )}
                </div>
                <Button 
                  onClick={startCamera} 
@@ -353,11 +378,11 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
                    <Camera className="mr-2 h-4 w-4" />
                    Take More
                  </Button>
-                 <Button 
-                   onClick={handleUpload} 
-                   disabled={!assignmentTitle.trim() || isUploading}
-                   className="flex-1"
-                 >
+                  <Button 
+                    onClick={handleUpload} 
+                    disabled={(!assignmentTitle && !newAssignmentTitle.trim()) || isUploading}
+                    className="flex-1"
+                  >
                    {isUploading ? (
                      <>
                        <Upload className="mr-2 h-4 w-4 animate-spin" />
