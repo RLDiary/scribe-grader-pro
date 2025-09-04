@@ -251,14 +251,24 @@ export const AssignmentDetails = () => {
                         </div>
                       </div>
                       
-                      {/* Placeholder for actual image - in real implementation, you'd display the actual image */}
-                      <div className="bg-muted rounded-lg aspect-[3/4] flex items-center justify-center">
-                        <div className="text-center space-y-2">
-                          <FileText className="h-16 w-16 text-muted-foreground mx-auto" />
-                          <p className="text-muted-foreground">Student Submission Preview</p>
-                          <p className="text-xs text-muted-foreground">
-                            Image would be displayed here in full implementation
-                          </p>
+                      {/* Display actual submission image */}
+                      <div className="bg-muted rounded-lg aspect-[3/4] overflow-hidden">
+                        <img
+                          src={supabase.storage.from('uploads').getPublicUrl(submission.file_path).data.publicUrl}
+                          alt={`Submission: ${submission.file_name}`}
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            target.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                        <div className="hidden w-full h-full flex items-center justify-center text-center space-y-2 p-4">
+                          <div>
+                            <FileText className="h-16 w-16 text-muted-foreground mx-auto" />
+                            <p className="text-muted-foreground">Unable to load image</p>
+                            <p className="text-xs text-muted-foreground">{submission.file_name}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
