@@ -94,7 +94,10 @@ export const Uploads = () => {
                 Use your phone or tablet to scan answer sheets directly
               </p>
             </div>
-            <Button className="w-full" onClick={() => setShowMobileScan(true)}>
+            <Button className="w-full" onClick={() => {
+              console.log('Mobile Scan button clicked'); // Debug log
+              setShowMobileScan(true);
+            }}>
               <Smartphone className="mr-2 h-4 w-4" />
               Start Mobile Scan
             </Button>
@@ -234,13 +237,17 @@ export const Uploads = () => {
 
       {/* Camera and Upload Modals */}
       {showMobileScan && (
-        <CameraCapture
-          mode="mobile_scan"
-          onClose={() => {
-            setShowMobileScan(false);
-            fetchRecentUploads();
-          }}
-        />
+        <>
+          {console.log('Rendering mobile scan modal')} {/* Debug log */}
+          <CameraCapture
+            mode="mobile_scan"
+            onClose={() => {
+              console.log('Closing mobile scan modal'); // Debug log
+              setShowMobileScan(false);
+              fetchRecentUploads();
+            }}
+          />
+        </>
       )}
 
       {showTabletCapture && (

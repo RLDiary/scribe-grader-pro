@@ -13,6 +13,8 @@ interface CameraCaptureProps {
 }
 
 export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) => {
+  console.log('CameraCapture component mounted with mode:', mode); // Debug log
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -145,8 +147,8 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
   }, [stopCamera]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl bg-background">
+    <div className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4">
+      <Card className="w-full max-w-2xl bg-background relative">
         <CardContent className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">
@@ -189,9 +191,9 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
                   className="mt-1"
                 />
               </div>
-              <Button onClick={startCamera} className="w-full">
-                Start Camera
-              </Button>
+            <Button onClick={startCamera} className="w-full" disabled={error !== null}>
+              {error ? 'Camera Unavailable' : 'Start Camera'}
+            </Button>
             </div>
           )}
 
