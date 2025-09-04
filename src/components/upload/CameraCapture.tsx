@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Camera, X, RotateCcw, Check, AlertCircle } from 'lucide-react';
+import { Camera, X, RotateCcw, Check, AlertCircle, Trash2, Upload } from 'lucide-react';
 import { useUpload } from '@/hooks/use-upload';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,9 +21,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
   
   const [isStreaming, setIsStreaming] = useState(false);
   const [isStartingCamera, setIsStartingCamera] = useState(false);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [assignmentTitle, setAssignmentTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   const { uploadFile, uploadProgress } = useUpload();
   const { toast } = useToast();
@@ -155,30 +156,61 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
         context.drawImage(video, 0, 0);
         
         const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        setCapturedImage(imageDataUrl);
-        stopCamera();
+        setCapturedImages(prev => [...prev, imageDataUrl]);
+        
+        toast({
+          title: "Photo Captured",
+          description: `${capturedImages.length + 1} photo(s) captured`,
+        });
       }
     }
-  }, [stopCamera]);
+  }, [capturedImages.length, toast]);
 
-  const retakePhoto = useCallback(() => {
-    setCapturedImage(null);
-    startCamera();
-  }, [startCamera]);
+  const removePhoto = useCallback((index: number) => {
+    setCapturedImages(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const clearAllPhotos = useCallback(() => {
+    setCapturedImages([]);
+  }, []);
 
   const handleUpload = useCallback(async () => {
-    if (!capturedImage || !assignmentTitle.trim()) return;
+    if (capturedImages.length === 0 || !assignmentTitle.trim()) return;
+    
+    setIsUploading(true);
+    let successCount = 0;
+    let errorCount = 0;
 
-    // Convert data URL to File
-    const response = await fetch(capturedImage);
-    const blob = await response.blob();
-    const file = new File([blob], `${mode}_${Date.now()}.jpg`, { type: 'image/jpeg' });
+    try {
+      for (let i = 0; i < capturedImages.length; i++) {
+        const imageDataUrl = capturedImages[i];
+        
+        // Convert data URL to File
+        const response = await fetch(imageDataUrl);
+        const blob = await response.blob();
+        const file = new File([blob], `${mode}_${Date.now()}_${i + 1}.jpg`, { type: 'image/jpeg' });
 
-    const result = await uploadFile(file, mode, assignmentTitle);
-    if (result.success) {
-      onClose();
+        const result = await uploadFile(file, mode, assignmentTitle);
+        if (result.success) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      }
+
+      toast({
+        title: "Upload Complete",
+        description: `${successCount} photo(s) uploaded successfully${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+        variant: errorCount > 0 ? "destructive" : "default",
+      });
+
+      if (successCount > 0) {
+        onClose();
+      }
+    } finally {
+      setIsUploading(false);
     }
-  }, [capturedImage, assignmentTitle, uploadFile, mode, onClose]);
+  }, [capturedImages, assignmentTitle, uploadFile, mode, onClose, toast]);
 
   const handleClose = useCallback(() => {
     stopCamera();
@@ -221,7 +253,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
              </div>
            )}
 
-          {isStartingCamera && !isStreaming && !capturedImage && (
+          {isStartingCamera && !isStreaming && capturedImages.length === 0 && (
             <div className="text-center space-y-4">
               <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto animate-pulse">
                 <Camera className="h-12 w-12 text-primary" />
@@ -233,81 +265,114 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
             </div>
           )}
 
-          {!isStreaming && !capturedImage && !isStartingCamera && (
-            <div className="text-center space-y-4">
-              <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                <Camera className="h-12 w-12 text-primary" />
-              </div>
-              <div>
-                <Label htmlFor="assignment-title">Assignment Title</Label>
-                <Input
-                  id="assignment-title"
-                  placeholder="Enter assignment title"
-                  value={assignmentTitle}
-                  onChange={(e) => setAssignmentTitle(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <Button 
-                onClick={startCamera} 
-                className="w-full" 
-                disabled={error !== null || isStartingCamera}
-              >
-                {isStartingCamera ? 'Starting Camera...' : (error ? 'Camera Unavailable' : 'Start Camera')}
-              </Button>
-            </div>
-          )}
+           {!isStreaming && capturedImages.length === 0 && !isStartingCamera && (
+             <div className="text-center space-y-4">
+               <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                 <Camera className="h-12 w-12 text-primary" />
+               </div>
+               <div>
+                 <Label htmlFor="assignment-title">Assignment Title</Label>
+                 <Input
+                   id="assignment-title"
+                   placeholder="Enter assignment title"
+                   value={assignmentTitle}
+                   onChange={(e) => setAssignmentTitle(e.target.value)}
+                   className="mt-1"
+                 />
+               </div>
+               <Button 
+                 onClick={startCamera} 
+                 className="w-full" 
+                 disabled={error !== null || isStartingCamera}
+               >
+                 {isStartingCamera ? 'Starting Camera...' : (error ? 'Camera Unavailable' : 'Start Camera')}
+               </Button>
+             </div>
+           )}
 
-          {(isStreaming || isStartingCamera) && (
-            <div className="space-y-4">
-              <div className="relative">
-                <video
-                  ref={videoRef}
-                  className="w-full rounded-lg"
-                  autoPlay
-                  playsInline
-                  muted
-                />
-                <div className="absolute inset-0 border-2 border-primary/50 rounded-lg pointer-events-none" />
-              </div>
-              {isStreaming && (
-                <Button onClick={capturePhoto} className="w-full">
-                  <Camera className="mr-2 h-4 w-4" />
-                  Capture Photo
-                </Button>
-              )}
-            </div>
-          )}
+           {(isStreaming || isStartingCamera) && (
+             <div className="space-y-4">
+               <div className="relative">
+                 <video
+                   ref={videoRef}
+                   className="w-full rounded-lg"
+                   autoPlay
+                   playsInline
+                   muted
+                 />
+                 <div className="absolute inset-0 border-2 border-primary/50 rounded-lg pointer-events-none" />
+               </div>
+               {isStreaming && (
+                 <div className="flex gap-2">
+                   <Button onClick={capturePhoto} className="flex-1">
+                     <Camera className="mr-2 h-4 w-4" />
+                     Capture Photo ({capturedImages.length})
+                   </Button>
+                   {capturedImages.length > 0 && (
+                     <Button variant="outline" onClick={stopCamera}>
+                       Done ({capturedImages.length})
+                     </Button>
+                   )}
+                 </div>
+               )}
+             </div>
+           )}
 
-          {capturedImage && (
-            <div className="space-y-4">
-              <img
-                src={capturedImage}
-                alt="Captured"
-                className="w-full rounded-lg border-2 border-primary/20"
-              />
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={retakePhoto} className="flex-1">
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Retake
-                </Button>
-                <Button 
-                  onClick={handleUpload} 
-                  disabled={!assignmentTitle.trim() || uploadProgress.isUploading}
-                  className="flex-1"
-                >
-                  {uploadProgress.isUploading ? (
-                    `Uploading... ${uploadProgress.progress}%`
-                  ) : (
-                    <>
-                      <Check className="mr-2 h-4 w-4" />
-                      Upload
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
+           {capturedImages.length > 0 && !isStreaming && (
+             <div className="space-y-4">
+               <div className="flex items-center justify-between">
+                 <h3 className="font-semibold">Captured Photos ({capturedImages.length})</h3>
+                 <Button variant="outline" size="sm" onClick={clearAllPhotos}>
+                   <Trash2 className="mr-2 h-3 w-3" />
+                   Clear All
+                 </Button>
+               </div>
+               
+               <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto">
+                 {capturedImages.map((image, index) => (
+                   <div key={index} className="relative group">
+                     <img
+                       src={image}
+                       alt={`Captured ${index + 1}`}
+                       className="w-full aspect-video object-cover rounded-lg border-2 border-primary/20"
+                     />
+                     <Button
+                       variant="destructive"
+                       size="sm"
+                       className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                       onClick={() => removePhoto(index)}
+                     >
+                       <X className="h-3 w-3" />
+                     </Button>
+                   </div>
+                 ))}
+               </div>
+
+               <div className="flex gap-2">
+                 <Button variant="outline" onClick={startCamera} className="flex-1">
+                   <Camera className="mr-2 h-4 w-4" />
+                   Take More
+                 </Button>
+                 <Button 
+                   onClick={handleUpload} 
+                   disabled={!assignmentTitle.trim() || isUploading}
+                   className="flex-1"
+                 >
+                   {isUploading ? (
+                     <>
+                       <Upload className="mr-2 h-4 w-4 animate-spin" />
+                       Uploading...
+                     </>
+                   ) : (
+                     <>
+                       <Check className="mr-2 h-4 w-4" />
+                       Upload All ({capturedImages.length})
+                     </>
+                   )}
+                 </Button>
+               </div>
+             </div>
+           )}
 
           <canvas ref={canvasRef} className="hidden" />
         </CardContent>
