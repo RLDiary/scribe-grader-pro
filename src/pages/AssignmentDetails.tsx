@@ -27,6 +27,7 @@ export const AssignmentDetails = () => {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (id) {
@@ -60,6 +61,28 @@ export const AssignmentDetails = () => {
 
       if (error) throw error;
       setSubmissions(data || []);
+
+      // Generate signed URLs for all images
+      const urlPromises = (data || []).map(async (submission) => {
+        try {
+          const { data: signedUrl } = await supabase.storage
+            .from('assignments')
+            .createSignedUrl(submission.file_path, 60 * 60); // 1 hour expiry
+          
+          return { id: submission.id, url: signedUrl?.signedUrl || null };
+        } catch (error) {
+          console.error('Error generating signed URL for', submission.file_name, error);
+          return { id: submission.id, url: null };
+        }
+      });
+
+      const urls = await Promise.all(urlPromises);
+      const urlsMap = urls.reduce((acc, { id, url }) => {
+        if (url) acc[id] = url;
+        return acc;
+      }, {} as Record<string, string>);
+
+      setSignedUrls(urlsMap);
     } catch (error) {
       console.error('Error fetching submissions:', error);
     } finally {
@@ -253,16 +276,23 @@ export const AssignmentDetails = () => {
                       
                       {/* Display actual submission image */}
                       <div className="bg-muted rounded-lg aspect-[3/4] overflow-hidden">
-                        <img
-                          src={supabase.storage.from('uploads').getPublicUrl(submission.file_path).data.publicUrl}
-                          alt={`Submission: ${submission.file_name}`}
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            target.nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
+                        {signedUrls[submission.id] ? (
+                          <img
+                            src={signedUrls[submission.id]}
+                            alt={`Submission: ${submission.file_name}`}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              console.error('Image failed to load:', target.src);
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                          </div>
+                        )}
                         <div className="hidden w-full h-full flex items-center justify-center text-center space-y-2 p-4">
                           <div>
                             <FileText className="h-16 w-16 text-muted-foreground mx-auto" />
