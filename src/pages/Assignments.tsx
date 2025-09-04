@@ -29,6 +29,7 @@ export const Assignments = () => {
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [assignmentsWithSubmissions, setAssignmentsWithSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({ title: "", description: "" });
   const { toast } = useToast();
@@ -39,13 +40,37 @@ export const Assignments = () => {
 
   const fetchAssignments = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setAssignments(data || []);
+      if (assignmentsError) throw assignmentsError;
+      setAssignments(assignmentsData || []);
+
+      // Fetch submissions for each assignment
+      const assignmentsWithSubmissionCounts = await Promise.all(
+        (assignmentsData || []).map(async (assignment) => {
+          const { data: submissionsData, error: submissionsError } = await supabase
+            .from('uploads')
+            .select('*')
+            .eq('assignment_id', assignment.id)
+            .order('uploaded_at', { ascending: false });
+
+          if (submissionsError) {
+            console.error('Error fetching submissions for assignment:', assignment.id, submissionsError);
+          }
+
+          return {
+            ...assignment,
+            submissions: submissionsData || [],
+            submissionCount: (submissionsData || []).length,
+            recentSubmissions: (submissionsData || []).slice(0, 3)
+          };
+        })
+      );
+
+      setAssignmentsWithSubmissions(assignmentsWithSubmissionCounts);
     } catch (error) {
       console.error('Error fetching assignments:', error);
     } finally {
@@ -223,42 +248,68 @@ export const Assignments = () => {
           <div className="space-y-4">
             {loading ? (
               <p className="text-center text-muted-foreground">Loading assignments...</p>
-            ) : assignments.length === 0 ? (
+            ) : assignmentsWithSubmissions.length === 0 ? (
               <p className="text-center text-muted-foreground">No assignments yet. Create your first assignment above!</p>
             ) : (
-              assignments.map((assignment) => (
+              assignmentsWithSubmissions.map((assignment) => (
                 <div
                   key={assignment.id}
-                  className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                  className="p-6 rounded-lg border hover:bg-muted/50 transition-colors space-y-4"
                 >
-                  <div className="space-y-1 flex-1">
-                    <div className="flex items-center space-x-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{assignment.title}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center space-x-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{assignment.title}</span>
+                        <span className="text-sm text-muted-foreground">
+                          ({assignment.submissionCount} submission{assignment.submissionCount !== 1 ? 's' : ''})
+                        </span>
+                      </div>
+                      {assignment.description && (
+                        <p className="text-sm text-muted-foreground">{assignment.description}</p>
+                      )}
+                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                        <span className="flex items-center">
+                          <Calendar className="mr-1 h-3 w-3" />
+                          Created {new Date(assignment.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
-                    {assignment.description && (
-                      <p className="text-sm text-muted-foreground">{assignment.description}</p>
-                    )}
-                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                      <span className="flex items-center">
-                        <Calendar className="mr-1 h-3 w-3" />
-                        Created {new Date(assignment.created_at).toLocaleDateString()}
-                      </span>
+                    <div className="flex items-center space-x-3">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => navigate(`/assignments/${assignment.id}`)}
+                      >
+                        <Users className="mr-2 h-4 w-4" />
+                        View Details ({assignment.submissionCount})
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => navigate(`/assignments/${assignment.id}`)}
-                    >
-                      <Users className="mr-2 h-4 w-4" />
-                      View Details
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      Edit
-                    </Button>
-                  </div>
+                  
+                  {/* Recent submissions preview */}
+                  {assignment.recentSubmissions.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Recent Submissions:</p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        {assignment.recentSubmissions.map((submission: any) => (
+                          <div
+                            key={submission.id}
+                            className="flex items-center space-x-2 p-2 bg-muted/50 rounded text-xs"
+                          >
+                            <Camera className="h-3 w-3 text-muted-foreground" />
+                            <span className="truncate">{submission.file_name}</span>
+                            <span className="text-muted-foreground">
+                              {new Date(submission.uploaded_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))
             )}
