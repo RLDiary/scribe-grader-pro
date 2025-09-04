@@ -41,6 +41,88 @@ export type Database = {
         }
         Relationships: []
       }
+      submission_files: {
+        Row: {
+          error_message: string | null
+          file_name: string
+          file_path: string
+          id: string
+          processing_time: string | null
+          status: string
+          storage_bucket: string
+          submission_id: string
+          uploaded_at: string
+        }
+        Insert: {
+          error_message?: string | null
+          file_name: string
+          file_path: string
+          id?: string
+          processing_time?: string | null
+          status?: string
+          storage_bucket?: string
+          submission_id: string
+          uploaded_at?: string
+        }
+        Update: {
+          error_message?: string | null
+          file_name?: string
+          file_path?: string
+          id?: string
+          processing_time?: string | null
+          status?: string
+          storage_bucket?: string
+          submission_id?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submission_files_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      submissions: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          id: string
+          status: string
+          student_identifier: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          id?: string
+          status?: string
+          student_identifier?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          id?: string
+          status?: string
+          student_identifier?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submissions_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uploads: {
         Row: {
           assignment_id: string | null

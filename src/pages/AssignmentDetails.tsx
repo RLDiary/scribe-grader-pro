@@ -53,26 +53,41 @@ export const AssignmentDetails = () => {
 
   const fetchSubmissions = async () => {
     try {
+      // Fetch submissions and their files using the new normalized schema
       const { data, error } = await supabase
-        .from('uploads')
-        .select('*')
+        .from('submissions')
+        .select(`
+          *,
+          submission_files (*)
+        `)
         .eq('assignment_id', id)
-        .order('uploaded_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSubmissions(data || []);
+      
+      // Transform the data to flatten submission files for easier handling
+      const submissionFiles = (data || []).flatMap(submission => 
+        (submission.submission_files || []).map(file => ({
+          ...file,
+          submission_id: submission.id,
+          submission_status: submission.status,
+          submission_created_at: submission.created_at
+        }))
+      );
+
+      setSubmissions(submissionFiles);
 
       // Generate signed URLs for all images
-      const urlPromises = (data || []).map(async (submission) => {
+      const urlPromises = submissionFiles.map(async (file) => {
         try {
           const { data: signedUrl } = await supabase.storage
             .from('assignments')
-            .createSignedUrl(submission.file_path, 60 * 60); // 1 hour expiry
+            .createSignedUrl(file.file_path, 60 * 60); // 1 hour expiry
           
-          return { id: submission.id, url: signedUrl?.signedUrl || null };
+          return { id: file.id, url: signedUrl?.signedUrl || null };
         } catch (error) {
-          console.error('Error generating signed URL for', submission.file_name, error);
-          return { id: submission.id, url: null };
+          console.error('Error generating signed URL for', file.file_name, error);
+          return { id: file.id, url: null };
         }
       });
 

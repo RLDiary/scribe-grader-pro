@@ -48,24 +48,37 @@ export const Assignments = () => {
       if (assignmentsError) throw assignmentsError;
       setAssignments(assignmentsData || []);
 
-      // Fetch submissions for each assignment
+      // Fetch submissions and their files for each assignment
       const assignmentsWithSubmissionCounts = await Promise.all(
         (assignmentsData || []).map(async (assignment) => {
+          // Get submissions for this assignment
           const { data: submissionsData, error: submissionsError } = await supabase
-            .from('uploads')
-            .select('*')
+            .from('submissions')
+            .select(`
+              *,
+              submission_files (*)
+            `)
             .eq('assignment_id', assignment.id)
-            .order('uploaded_at', { ascending: false });
+            .order('created_at', { ascending: false });
 
           if (submissionsError) {
             console.error('Error fetching submissions for assignment:', assignment.id, submissionsError);
           }
 
+          // Flatten submission files for recent submissions preview
+          const allFiles = (submissionsData || []).flatMap(submission => 
+            (submission.submission_files || []).map(file => ({
+              ...file,
+              submission_id: submission.id
+            }))
+          );
+
           return {
             ...assignment,
             submissions: submissionsData || [],
             submissionCount: (submissionsData || []).length,
-            recentSubmissions: (submissionsData || []).slice(0, 3)
+            totalFiles: allFiles.length,
+            recentFiles: allFiles.slice(0, 3)
           };
         })
       );
@@ -290,20 +303,20 @@ export const Assignments = () => {
                     </div>
                   </div>
                   
-                  {/* Recent submissions preview */}
-                  {assignment.recentSubmissions.length > 0 && (
+                  {/* Recent files preview */}
+                  {assignment.recentFiles.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Recent Submissions:</p>
+                      <p className="text-sm font-medium text-muted-foreground">Recent Files ({assignment.totalFiles} total):</p>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                        {assignment.recentSubmissions.map((submission: any) => (
+                        {assignment.recentFiles.map((file: any) => (
                           <div
-                            key={submission.id}
+                            key={file.id}
                             className="flex items-center space-x-2 p-2 bg-muted/50 rounded text-xs"
                           >
                             <Camera className="h-3 w-3 text-muted-foreground" />
-                            <span className="truncate">{submission.file_name}</span>
+                            <span className="truncate">{file.file_name}</span>
                             <span className="text-muted-foreground">
-                              {new Date(submission.uploaded_at).toLocaleDateString()}
+                              {new Date(file.uploaded_at).toLocaleDateString()}
                             </span>
                           </div>
                         ))}
