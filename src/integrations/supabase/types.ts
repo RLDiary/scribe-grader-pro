@@ -14,7 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      assignments: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      uploads: {
+        Row: {
+          assignment_id: string | null
+          error_message: string | null
+          file_name: string
+          file_path: string
+          id: string
+          processed_at: string | null
+          processing_time: string | null
+          status: string
+          student_count: number | null
+          upload_method: string
+          uploaded_at: string
+          user_id: string
+        }
+        Insert: {
+          assignment_id?: string | null
+          error_message?: string | null
+          file_name: string
+          file_path: string
+          id?: string
+          processed_at?: string | null
+          processing_time?: string | null
+          status?: string
+          student_count?: number | null
+          upload_method: string
+          uploaded_at?: string
+          user_id: string
+        }
+        Update: {
+          assignment_id?: string | null
+          error_message?: string | null
+          file_name?: string
+          file_path?: string
+          id?: string
+          processed_at?: string | null
+          processing_time?: string | null
+          status?: string
+          student_count?: number | null
+          upload_method?: string
+          uploaded_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uploads_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

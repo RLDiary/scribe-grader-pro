@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -10,37 +11,40 @@ import {
   Smartphone,
   Tablet
 } from "lucide-react";
+import { CameraCapture } from "@/components/upload/CameraCapture";
+import { FileUpload } from "@/components/upload/FileUpload";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Uploads = () => {
-  const uploadHistory = [
-    {
-      id: 1,
-      fileName: "Math_Quiz_3_Class_A.pdf",
-      assignment: "Algebra Quiz #3",
-      uploadedAt: "2024-01-15 14:30",
-      status: "processed",
-      studentCount: 28,
-      processingTime: "45s",
-    },
-    {
-      id: 2,
-      fileName: "Science_Test_Biology.pdf",
-      assignment: "Biology Midterm",
-      uploadedAt: "2024-01-15 10:15",
-      status: "processing",
-      studentCount: 32,
-      processingTime: "2m 30s",
-    },
-    {
-      id: 3,
-      fileName: "English_Essay_Photos.zip",
-      assignment: "Creative Writing",
-      uploadedAt: "2024-01-14 16:45",
-      status: "failed",
-      studentCount: 0,
-      error: "Unclear handwriting detected",
-    },
-  ];
+  const [showMobileScan, setShowMobileScan] = useState(false);
+  const [showTabletCapture, setShowTabletCapture] = useState(false);
+  const [showFileUpload, setShowFileUpload] = useState(false);
+  const [recentUploads, setRecentUploads] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchRecentUploads();
+  }, []);
+
+  const fetchRecentUploads = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('uploads')
+        .select(`
+          *,
+          assignments(title)
+        `)
+        .order('uploaded_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setRecentUploads(data || []);
+    } catch (error) {
+      console.error('Error fetching uploads:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -90,7 +94,7 @@ export const Uploads = () => {
                 Use your phone or tablet to scan answer sheets directly
               </p>
             </div>
-            <Button className="w-full">
+            <Button className="w-full" onClick={() => setShowMobileScan(true)}>
               <Smartphone className="mr-2 h-4 w-4" />
               Start Mobile Scan
             </Button>
@@ -108,7 +112,7 @@ export const Uploads = () => {
                 Perfect for classroom use with larger screens
               </p>
             </div>
-            <Button variant="secondary" className="w-full">
+            <Button variant="secondary" className="w-full" onClick={() => setShowTabletCapture(true)}>
               <Tablet className="mr-2 h-4 w-4" />
               Use Tablet Mode
             </Button>
@@ -126,7 +130,7 @@ export const Uploads = () => {
                 Upload pre-scanned PDFs or image files
               </p>
             </div>
-            <Button variant="outline" className="w-full border-accent text-accent hover:bg-accent hover:text-accent-foreground">
+            <Button variant="outline" className="w-full border-accent text-accent hover:bg-accent hover:text-accent-foreground" onClick={() => setShowFileUpload(true)}>
               <Upload className="mr-2 h-4 w-4" />
               Browse Files
             </Button>
@@ -173,7 +177,12 @@ export const Uploads = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {uploadHistory.map((upload) => (
+            {loading ? (
+              <p className="text-center text-muted-foreground">Loading uploads...</p>
+            ) : recentUploads.length === 0 ? (
+              <p className="text-center text-muted-foreground">No uploads yet. Start by uploading your first assignment!</p>
+            ) : (
+              recentUploads.map((upload) => (
               <div
                 key={upload.id}
                 className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
@@ -181,28 +190,28 @@ export const Uploads = () => {
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{upload.fileName}</span>
+                    <span className="font-medium">{upload.file_name}</span>
                     {getStatusIcon(upload.status)}
                   </div>
                   <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                    <span>{upload.assignment}</span>
+                    <span>{upload.assignments?.title || 'Untitled Assignment'}</span>
                     <span>•</span>
-                    <span>{upload.uploadedAt}</span>
-                    {upload.studentCount > 0 && (
+                    <span>{new Date(upload.uploaded_at).toLocaleString()}</span>
+                    {upload.student_count > 0 && (
                       <>
                         <span>•</span>
-                        <span>{upload.studentCount} students</span>
+                        <span>{upload.student_count} students</span>
                       </>
                     )}
                   </div>
-                  {upload.error && (
-                    <p className="text-sm text-destructive">{upload.error}</p>
+                  {upload.error_message && (
+                    <p className="text-sm text-destructive">{upload.error_message}</p>
                   )}
                 </div>
                 <div className="flex items-center space-x-3">
-                  {upload.processingTime && (
+                  {upload.processing_time && (
                     <span className="text-sm text-muted-foreground">
-                      {upload.processingTime}
+                      {upload.processing_time}
                     </span>
                   )}
                   <span
@@ -217,10 +226,41 @@ export const Uploads = () => {
                   </Button>
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Camera and Upload Modals */}
+      {showMobileScan && (
+        <CameraCapture
+          mode="mobile_scan"
+          onClose={() => {
+            setShowMobileScan(false);
+            fetchRecentUploads();
+          }}
+        />
+      )}
+
+      {showTabletCapture && (
+        <CameraCapture
+          mode="tablet_capture"
+          onClose={() => {
+            setShowTabletCapture(false);
+            fetchRecentUploads();
+          }}
+        />
+      )}
+
+      {showFileUpload && (
+        <FileUpload
+          onClose={() => {
+            setShowFileUpload(false);
+            fetchRecentUploads();
+          }}
+        />
+      )}
     </div>
   );
 };
