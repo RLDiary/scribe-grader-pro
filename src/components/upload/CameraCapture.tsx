@@ -20,6 +20,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
   const streamRef = useRef<MediaStream | null>(null);
   
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [assignmentTitle, setAssignmentTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
   const startCamera = useCallback(async () => {
     console.log('Starting camera...'); // Debug log
     setError(null); // Clear any previous errors
+    setIsStartingCamera(true);
     
     try {
       // Check if getUserMedia is supported
@@ -41,11 +43,13 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
       
       const constraints = {
         video: {
-          facingMode: 'environment', // Use back camera
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+          facingMode: { ideal: 'environment' }, // Prefer back camera but allow front if needed
+          width: { ideal: 1920, min: 640 },
+          height: { ideal: 1080, min: 480 }
         }
       };
+
+      console.log('Camera constraints:', constraints);
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       console.log('Camera stream obtained successfully'); // Debug log
@@ -55,11 +59,35 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         
+        // Fallback: if metadata doesn't load within 3 seconds, try to start anyway
+        const timeoutId = setTimeout(() => {
+          if (videoRef.current && videoRef.current.srcObject && !videoRef.current.played.length) {
+            console.log('Metadata timeout - forcing stream start');
+            videoRef.current.play().then(() => {
+              setIsStreaming(true);
+              setIsStartingCamera(false);
+            }).catch((error) => {
+              console.error('Timeout fallback play error:', error);
+              setIsStreaming(true);
+              setIsStartingCamera(false);
+            });
+          }
+        }, 3000);
+        
         // Wait for video to be ready before setting isStreaming
         videoRef.current.onloadedmetadata = () => {
+          clearTimeout(timeoutId);
           console.log('Video metadata loaded, starting playback');
-          videoRef.current?.play();
-          setIsStreaming(true);
+          videoRef.current?.play().then(() => {
+            console.log('Video playback started successfully');
+            setIsStreaming(true);
+            setIsStartingCamera(false);
+          }).catch((error) => {
+            console.error('Error starting video playback:', error);
+            // Still set streaming to true as the stream is available
+            setIsStreaming(true);
+            setIsStartingCamera(false);
+          });
         };
       }
     } catch (error) {
@@ -82,6 +110,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
       }
       
       setError(errorMessage);
+      setIsStartingCamera(false);
       toast({
         title: "Camera Error",
         description: errorMessage,
@@ -176,7 +205,19 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
              </div>
            )}
 
-          {!isStreaming && !capturedImage && (
+          {isStartingCamera && !isStreaming && !capturedImage && (
+            <div className="text-center space-y-4">
+              <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                <Camera className="h-12 w-12 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Starting Camera...</h3>
+                <p className="text-sm text-muted-foreground">Please allow camera access when prompted</p>
+              </div>
+            </div>
+          )}
+
+          {!isStreaming && !capturedImage && !isStartingCamera && (
             <div className="text-center space-y-4">
               <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
                 <Camera className="h-12 w-12 text-primary" />
@@ -191,9 +232,13 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ mode, onClose }) =
                   className="mt-1"
                 />
               </div>
-            <Button onClick={startCamera} className="w-full" disabled={error !== null}>
-              {error ? 'Camera Unavailable' : 'Start Camera'}
-            </Button>
+              <Button 
+                onClick={startCamera} 
+                className="w-full" 
+                disabled={error !== null || isStartingCamera}
+              >
+                {isStartingCamera ? 'Starting Camera...' : (error ? 'Camera Unavailable' : 'Start Camera')}
+              </Button>
             </div>
           )}
 
