@@ -304,9 +304,9 @@ export const Assignments = () => {
                   </div>
                   
                   {/* Recent files preview */}
-                  {assignment.recentFiles.length > 0 && (
+                  {Array.isArray(assignment.recentFiles) && assignment.recentFiles.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Recent Files ({assignment.totalFiles} total):</p>
+                      <p className="text-sm font-medium text-muted-foreground">Recent Files ({assignment.totalFiles ?? 0} total):</p>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                         {assignment.recentFiles.map((file: any) => (
                           <div
